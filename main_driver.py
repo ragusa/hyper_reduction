@@ -21,15 +21,66 @@ plt.close('all')
 #
 # geometry and mesh
 #
+geo_id_ = 1
+
+"""
+# this part does not work on windows machine
 from create_geometry import create_geometry
 
 # create specific geometry
-# id=1, vol=1e-2--> 151 elements || last used: 2e-3
-# id=2, vol=1e1 -->  62 elements || last used: 0.05
-# id=3, vol=1e2 --> 130 elements || last used: 1.
-# id=4, vol=11. --> 532 elements || last used: 3.
-geo_id = 4
-el2pt, el2at, fa2pt, fa2ma, pt2xy, el2ne = create_geometry(geo_id,max_vol=11,do_plot=False)
+# id=1, vol=1e-2--> 151 elements
+# id=2, vol=1e1 -->  62 elements
+# id=3, vol=1e2 --> 130 elements
+
+def rf(vertices, area):
+    bary = np.sum(np.array(vertices), axis=0) / 3
+    x,y = bary[0], bary[1]
+    rad = np.sqrt(x*x+y*y)
+    a=0.01/5
+    if rad>0.8:
+        max_area = a
+    elif rad>0.6:
+        max_area = a/2
+    elif rad>0.4:
+        max_area = a/4
+    elif rad>0.2:
+        max_area = a/8
+    else:
+        max_area = a/16
+    # max_area = 0.1
+    return bool(area > max_area)
+
+el2pt, el2at, fa2pt, fa2ma, pt2xy, el2ne = create_geometry(geo_id=geo_id_,max_vol=1e-3,\
+                                                           refinement_funct=rf,do_plot=False)
+"""
+# whether or not the geometry was created with a refinement function or not
+with_ref = False
+if with_ref:
+    ref_txt = '_REF'
+else:
+    ref_txt = ''
+
+# geo_id      nelems
+#  1       | 151 , 1553 , 3085 , 15620
+#  2       | 599 , 6266 , 62278
+#  4       | 104
+#  5       | 153 , 322  , 1544
+#  5 REF   | 2258, 4413
+#  6       | 316 , 1530, 3049, 15221
+#  7       | 159 , 319 , 1538, 1557, 5118
+#  8       | 1 , 80
+#  9       | 154, 314, 1542, 3025, 5080, 15246
+
+# create basename to reload data
+basename = './geo-'+str(geo_id_)+'/geo_id' + str(geo_id_) + ref_txt + '_elems' +'151'
+
+el2pt = np.loadtxt(basename+'_el2pt.txt', dtype=int)
+el2at = np.loadtxt(basename+'_el2at.txt', dtype=int)
+fa2pt = np.loadtxt(basename+'_fa2pt.txt', dtype=int)
+fa2ma = np.loadtxt(basename+'_fa2ma.txt', dtype=int)
+pt2xy = np.loadtxt(basename+'_pt2xy.txt')
+el2ne = np.loadtxt(basename+'_el2ne.txt', dtype=int)
+# raise ValueError('stopping')
 
 # finish mesh
 from tri_mesh import TriMesh
@@ -37,13 +88,24 @@ from tri_mesh import TriMesh
 mesh = TriMesh(el2pt, el2at, fa2pt, fa2ma, pt2xy, el2ne)
 mesh.complete()
 
+# to plot the mesh
+mesh.plot_mesh()
+
+# if you want to pickle the data or not
+# import pickle as pickle
+# with open('mesh'+str(geo_id_)+'.pkl', 'wb') as outp:
+#     pickle.dump(mesh, outp, pickle.HIGHEST_PROTOCOL)
+
+# with open('mesh'+str(geo_id_)+'.pkl', 'rb') as inp:
+#     mesh = pickle.load(inp)
+
 ##########################################################
 #
 # data for that problem
 #
 # Caveat: cdif, siga, qext must be entered in the order the materials are listed
 # in mesh.attr
-if geo_id == 1:
+if geo_id_ == 1:
     #bc_neu={"markers":np.array([3,4],dtype=int),"values":np.array([0.1,2.5])}
     bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_rob={"markers":np.array([1,2,3,4],dtype=int),"values":np.array([0,0,0,1])}
@@ -51,23 +113,21 @@ if geo_id == 1:
     bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
     bc_key_list = ["Dirichlet","Robin","Neumann"]
     mesh.check_bc(bc, bc_key_list)
-    # Caveat: cdif, siga, qext must be entered in the order the materials are listed
-    # in mesh.attr
+
     cdif = np.array([1,3],dtype=float)
     siga = np.array([50,1],dtype=float)
     qext = np.array([100,0],dtype=float)
     Jinc = np.array([0,0,0,1],dtype=float)
     Jneu = np.array([0,0,0,0],dtype=float)
     limits = np.array([])
-elif geo_id ==2:
+elif geo_id_ ==2:
     bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
     bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
     bc_key_list = ["Dirichlet","Robin","Neumann"]
     mesh.check_bc(bc, bc_key_list)
-    # Caveat: cdif, siga, qext must be entered in the order the materials are listed
-    # in mesh.attr
+
     sigt = np.array([1,1.5,1],dtype=float)
     c = np.array([0.9,0.96,0.3],dtype=float)
     sigs = c*sigt
@@ -77,15 +137,14 @@ elif geo_id ==2:
     Jinc = np.array([0],dtype=float)
     Jneu = np.array([])
     limits = np.array([])
-elif geo_id ==3:
+elif geo_id_ ==3:
     bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
     bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
     bc_key_list = ["Dirichlet","Robin","Neumann"]
     mesh.check_bc(bc, bc_key_list)
-    # Caveat: cdif, siga, qext must be entered in the order the materials are listed
-    # in mesh.attr
+
     sigt = np.array([0.60,0.48,0.70,0.65,0.90],dtype=float)
     siga = np.array([0.07,0.28,0.04,0.15,0.01],dtype=float)
     sigs0 = sigt -siga
@@ -96,15 +155,14 @@ elif geo_id ==3:
     Jinc = np.array([0],dtype=float)
     Jneu = np.array([])
     limits = np.array([])
-elif geo_id ==4:
+elif geo_id_ ==4:
     bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
     bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
     bc_key_list = ["Dirichlet","Robin","Neumann"]
     mesh.check_bc(bc, bc_key_list)
-    # Caveat: cdif, siga, qext must be entered in the order the materials are listed
-    # in mesh.attr
+
     siga = np.array([0.0197,0.0197,0.2256,0.0197],dtype=float)
     sigs = np.array([3.3136,3.3136,1.1077,3.3136],dtype=float)
     sigt = siga + sigs
@@ -114,7 +172,10 @@ elif geo_id ==4:
     Jneu = np.array([])
     limits = np.array([])
 else:
-    raise ValueError('unknown geo_id = ',geo_id)
+    raise ValueError('unknown geo_id = ',geo_id_)
+
+
+raise ValueError('unknown geo_id = ',geo_id_)
 ##########################################################
 #
 # linear operators per attribute
