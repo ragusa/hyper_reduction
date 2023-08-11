@@ -7,24 +7,24 @@ import matplotlib.tri as mtri
 import scipy.sparse.linalg
 
 
-plt.close('all')
+plt.close("all")
 #######################################################
-basename = 'geo-1-7812' 
-extra = '_v2'
+basename = "geo-1-7812"
+extra = "_v2"
 
-filename = basename + extra + '/' + basename + '_Mesh.npy'
+filename = basename + extra + "/" + basename + "_Mesh.npy"
 pt2xy = np.load(filename)
 
-filename = basename + extra + '/' + basename + '_Ur.npy'
+filename = basename + extra + "/" + basename + "_Ur.npy"
 ur = np.load(filename)
 dofs = ur.shape[0]
 rank = ur.shape[1]
-                        
-filename = basename + extra + '/' + basename + '_Snapshots.npy'
-sol  = np.load(filename)
+
+filename = basename + extra + "/" + basename + "_Snapshots.npy"
+sol = np.load(filename)
 
 
-extra = extra + '/pix'
+extra = extra + "/pix"
 
 # for i in range(sol.shape[1]):
 #     # fig = plt.figure(1)
@@ -70,9 +70,9 @@ extra = extra + '/pix'
 
 u, sv, vh = np.linalg.svd(sol, full_matrices=False, compute_uv=True)
 plt.figure(1)
-#plt.semilogy(sv, label='POD-'+str(number_of_snapshots))
-plt.semilogy(sv, label='POD-')
+# plt.semilogy(sv, label='POD-'+str(number_of_snapshots))
+plt.semilogy(sv, label="POD-")
 plt.legend()
-plt.title('Singular Value Decay')
-plt.grid('on')
+plt.title("Singular Value Decay")
+plt.grid("on")
 plt.show()
