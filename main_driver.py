@@ -147,25 +147,18 @@ Phi = scipy.sparse.linalg.spsolve(A, b)
 
 if mesh.npts < 10000:
     fig = plt.figure(99)
-    ax = fig.gca(projection='3d')
+    # ax = fig.gca(projection='3d')
+    ax = fig.add_subplot(projection='3d')
     ax.plot_trisurf(mesh.pt2xy[:,0], mesh.pt2xy[:,1], Phi, linewidth=0.2, cmap=plt.cm.CMRmap)
     plt.show()
-# fig = plt.figure()
-# Phi2=np.copy(Phi)
-# a=1e-5
-# Phi2[Phi2<a]=a
-# ax = fig.gca(projection='3d')
-# ax.plot_trisurf(mesh.pt2xy[:,0], mesh.pt2xy[:,1], np.log10(Phi2), linewidth=0.2, cmap=plt.cm.CMRmap, linewidths=0.2)
-# ax.view_init(60, -135)
-# plt.show()
 
-raise ValueError('a')
+
 ##########################################################
 #
 # Prepare for data perturbations
 #
-def new_param_values_list(cdif, siga, qext, Jinc, Jneu, limits, which_to_pert, Pts):
-    # Pts: nsamples x effective_npert (obtained from Tasmanian)
+def new_param_values_list(cdif, siga, qext, bc, limits, which_to_pert, Pts):
+    # Pts: nsamples x effective_npert
     #print('Points');print(Pts)
     nsamples = Pts.shape[0]
     npert    = Pts.shape[1]
@@ -175,15 +168,17 @@ def new_param_values_list(cdif, siga, qext, Jinc, Jneu, limits, which_to_pert, P
     # duplicate the nominal values
     aux = np.append(cdif,siga)
     aux = np.append(aux,qext)
-    aux = np.append(aux,Jinc)
-    aux = np.append(aux,Jneu)
+    for key in bc.keys():
+        aux = np.append(aux,bc[key]['values'])
+
     one = np.ones([nsamples,1])
     tmp = np.kron(aux, one) # nsamples x npert
     if len(which_to_pert) != limits.shape[0]:
         raise ValueError('len(which_to_pert) != limits.shape[0]')
+        
     counter = 0
-    for p in range(len(which_to_pert)):
-        if which_to_pert[p]:
+    for p, logical in enumerate(which_to_pert):
+        if logical:
             xi = Pts[:,counter]
             # x = x_ave + (x2-x1)/2 * xi
             ave   = ( limits[p,1] + limits[p,0] ) / 2
@@ -197,139 +192,42 @@ def new_param_values_list(cdif, siga, qext, Jinc, Jneu, limits, which_to_pert, P
     siga_ = np.array(tmp[:,n1:n2])
     n1 = n2; n2 = n1 + len(qext)
     qext_ = np.array(tmp[:,n1:n2])
-    n1 = n2; n2 = n1 + len(Jinc)
-    Jinc_ = np.array(tmp[:,n1:n2])
-    n1 = n2;
-    Jneu_ = np.array(tmp[:,n1:])
+    bc_ = {}
+    for key in bc.keys():
+        bc_[key] = {}
+        bc_[key]['markers'] = np.copy(bc[key]['markers'])
+        n1 = n2; n2 = n1 + len(bc[key]['values'])
+        bc_[key]['values'] = np.array(tmp[:,n1:n2])
 
-    return cdif_,siga_,qext_,Jinc_,Jneu_
+    return cdif_,siga_,qext_,bc_
 
-def new_param_values_single(cdif, siga, qext, Jinc, Jneu, limits, which_to_pert, Pts):
-    # Pts: nsamples x effective_npert (obtained from Tasmanian)
-    #print('Points ... ');print(Pts)
-    npert    = Pts.shape[0]
-    if npert != len( np.where(which_to_pert==True)[0] ):
-        raise ValueError('Pts.shape[0] and len( np.where(which_to_pert==True)[0] ) mismatch')
-
-    # duplicate the nominal values
-    aux = np.append(cdif,siga)
-    aux = np.append(aux,qext)
-    aux = np.append(aux,Jinc)
-    aux = np.append(aux,Jneu)
-    #print("aux = ",aux)
-    #print("limits = \n",limits)
-    #print(type(aux))
-    if len(which_to_pert) != limits.shape[0]:
-        raise ValueError('len(which_to_pert) != limits.shape[0]')
-    counter = 0
-    for p in range(len(which_to_pert)):
-        if which_to_pert[p]:
-            xi = Pts[counter]
-            # x = x_ave + (x2-x1)/2 * xi
-            ave   = ( limits[p,1] + limits[p,0] ) / 2
-            slope = ( limits[p,1] - limits[p,0] ) / 2
-            aux[p] = ave + xi * slope
-            #print("lim1 = {0}, lim2 = {1}".format(limits[p,0],limits[p,1]))
-            #print("average {0}, slope {1}, xi {2}, p {3}, val {4}".format(ave,slope,xi,p,aux[p]))
-            counter +=1
-    # place in array to be returned
-    n1 = 0; n2 = len(cdif)
-    cdif_ = np.array(aux[n1:n2])
-    n1 = n2; n2 = n1 + len(siga)
-    siga_ = np.array(aux[n1:n2])
-    n1 = n2; n2 = n1 + len(qext)
-    qext_ = np.array(aux[n1:n2])
-    n1 = n2; n2 = n1 + len(Jinc)
-    Jinc_ = np.array(aux[n1:n2])
-    n1 = n2;
-    Jneu_ = np.array(aux[n1:])
-    #for a in aux:
-    #  print(a)
-
-    return cdif_,siga_,qext_,Jinc_,Jneu_
 
 if geo_id_ == 1:
-    which_to_pert = np.zeros(14, dtype=bool)
-    which_to_pert[0:5] = True
-    #which_to_pert[5] = True
-    limits = np.array([[0.1,3], [0.1,5],\
-                      [5,75], [0.1,3],\
-                      [2,200], [0.1,1],\
-                      [0.1,1], [0.1,1], [0.1,1],[0.1,1],\
-                      [0.1,1], [0.1,1], [0.1,1],[0.1,1]])
-
-    ff=0.92; a0 = np.array([1-ff,1+ff])
-    limits = np.array([cdif[0]*a0, cdif[1]*a0,\
-                      siga[0]*a0, siga[1]*a0,\
-                      qext[0]*a0, qext[1]*a0,\
-                      0*a0, 0*a0, 0*a0, Jinc[-1]*a0,\
-                      0*a0, 0*a0, 0*a0, 0*a0])
-
-    # hardcoded for this problem
-    if len(which_to_pert) != 14:
-        raise ValueError('for geo_id=1, we need 14 params: D(2), siga(2), Q(2), Jinc(4), Jneu(4)')
-    Pts = 0.3*np.ones((3,5))
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-    Pts = 0.13*np.ones(5)
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-elif geo_id_ == 2:
     which_to_pert = np.zeros(10, dtype=bool)
     which_to_pert[0:5] = True
+    #which_to_pert[5] = True
+    # limits = np.array([[0.1,3], [0.1,5],\
+    #                   [5,75], [0.1,3],\
+    #                   [2,200], [0.1,1],\
+    #                   [0.1,1], [0.1,1], [0.1,1],[0.1,1],\
+    #                   [0.1,1], [0.1,1], [0.1,1],[0.1,1]])
+
     ff=0.92; a0 = np.array([1-ff,1+ff])
-    limits = np.array([cdif[0]*a0, cdif[1]*a0, cdif[2]*a0, cdif[3]*a0,\
-                      siga[0]*a0, siga[1]*a0, siga[2]*a0, siga[3]*a0,\
-                      qext[0]*a0, qext[1]*a0, qext[2]*a0, qext[3]*a0,\
-                      Jinc[0]*a0])
+    limits = np.array([ cdif[0]*a0, cdif[1]*a0,\
+                        siga[0]*a0, siga[1]*a0,\
+                        qext[0]*a0, qext[1]*a0,\
+                        0*a0, 0*a0, 0*a0, Jinc[-1]*a0 ])
 
     # hardcoded for this problem
     if len(which_to_pert) != 10:
-        raise ValueError('for geo_id=2, we need 10 params: D(0:2), siga(0:2), Q(0:2), Jinc(0)')
+        raise ValueError('for geo_id=1, we need 10 params: D(2), siga(2), Q(2), Jinc(4)')
     Pts = 0.3*np.ones((3,5))
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-    Pts = 0.13*np.ones(5)
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-elif geo_id_ == 3:
-    which_to_pert = np.zeros(16, dtype=bool)
-    which_to_pert[0:5] = True
-    ff=0.92; a0 = np.array([1-ff,1+ff])
-    limits = np.array([cdif[0]*a0, cdif[1]*a0, cdif[2]*a0, cdif[3]*a0, cdif[4]*a0,\
-                      siga[0]*a0, siga[1]*a0, siga[2]*a0, siga[3]*a0, siga[4]*a0,\
-                      qext[0]*a0, qext[1]*a0, qext[2]*a0, qext[3]*a0, qext[4]*a0,\
-                      Jinc[0]*a0])
+    cdif_,siga_,qext_,bc_ = new_param_values_list(cdif,siga,qext,bc,\
+                                                  limits,which_to_pert,Pts)
 
-    # hardcoded for this problem
-    if len(which_to_pert) != 16:
-        raise ValueError('for geo_id=3, we need 16 params: D(0:4), siga(0:4), Q(0:4), Jinc(0)')
-    Pts = 0.3*np.ones((3,5))
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-    Pts = 0.13*np.ones(5)
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-elif geo_id_ == 4:
-    which_to_pert = np.zeros(13, dtype=bool)
-    which_to_pert[0:5] = True
-    ff=0.92; a0 = np.array([1-ff,1+ff])
-    limits = np.array([cdif[0]*a0, cdif[1]*a0, cdif[2]*a0, cdif[3]*a0,\
-                      siga[0]*a0, siga[1]*a0, siga[2]*a0, siga[3]*a0,\
-                      qext[0]*a0, qext[1]*a0, qext[2]*a0, qext[3]*a0,\
-                      Jinc[0]*a0])
-
-    # hardcoded for this problem
-    if len(which_to_pert) != 13:
-        raise ValueError('for geo_id=4, we need 13 params: D(0:3), siga(0:3), Q(0:3), Jinc(0)')
-    Pts = 0.3*np.ones((3,5))
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
-    Pts = 0.13*np.ones(5)
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
-                                                    limits,which_to_pert,Pts)
 else:
-    raise ValueError('which_to_pert stills need to be implement for other geometries')
+    raise ValueError('which_to_pert stills need to be implemented for other geometries')
+
 
 # number of input space dimensions
 iNumDimensions = len( np.where(which_to_pert==True)[0] )
@@ -339,20 +237,25 @@ iNumDimensions = len( np.where(which_to_pert==True)[0] )
 # Classic POD
 #
 # get samples in [-1,+1]^dim
-number_of_snapshots=250
+number_of_snapshots = 250
 use_LHS = False
 TrainPoints = sampler(number_of_snapshots, iNumDimensions, use_LHS)
 
 # get new values of parameters
-cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                     limits,which_to_pert,TrainPoints)
+cdif_,siga_,qext_,bc_ = new_param_values_list(cdif,siga,qext,bc,\
+                                              limits,which_to_pert,TrainPoints)
 
 # compute snapshot values
 pod_snapshots = np.zeros((mesh.npts, number_of_snapshots))
 for ipt in range(TrainPoints.shape[0]):
     # get system and solve
+    bc__ = {}
+    for key in bc.keys():
+        bc__[key] = {}
+        bc__[key]['markers'] = np.copy(bc_[key]['markers'])
+        bc__[key]['values']  = bc_[key]['values'][ipt,:]
     A, b = lin_op.build_diffusion_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], \
-                                          bc, Jinc_[ipt,:], Jneu_[ipt,:])
+                                          bc__)
     Phi = scipy.sparse.linalg.spsolve(A, b)
     pod_snapshots[:,ipt] = Phi
 # perform SVD
@@ -378,21 +281,25 @@ nn = np.minimum(number_of_snapshots,2*rank)
 plt.plot(ec[0:nn])
 plt.show()
 
+
 # testing
-number_of_tests = 500
+number_of_tests = 50
 TestPoints = sampler(number_of_tests, iNumDimensions, use_LHS)
 # get new values of parameters
-cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
-                                                     limits,which_to_pert,TestPoints)
+cdif_,siga_,qext_,bc_ = new_param_values_list(cdif,siga,qext,bc,\
+                                              limits,which_to_pert,TestPoints)
 rela_err = np.zeros(TestPoints.shape[0])
 for ipt in range(TestPoints.shape[0]):
     # get system and solve
-    Ar, br = lin_op.build_reduced_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], \
-                                          bc, Jinc_[ipt,:], Jneu_[ipt,:])
+    bc__ = {}
+    for key in bc.keys():
+        bc__[key] = {}
+        bc__[key]['markers'] = np.copy(bc_[key]['markers'])
+        bc__[key]['values']  = bc_[key]['values'][ipt,:]
+    Ar, br = lin_op.build_reduced_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], bc__)
     c = np.linalg.solve(Ar,br)
     Phi_r = ur @ c
-    A, b = lin_op.build_diffusion_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], \
-                                          bc, Jinc_[ipt,:], Jneu_[ipt,:])
+    A, b = lin_op.build_diffusion_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], bc__)
     Phi = scipy.sparse.linalg.spsolve(A, b)
     flx_err = 100*np.linalg.norm(Phi-Phi_r) / np.linalg.norm(Phi)
     rela_err[ipt] = flx_err
@@ -404,16 +311,18 @@ plt.show()
 sv_classic = np.copy(sv)
 
 
+
 ##########################################################
 #
 # greedy POD
 #
-MiddlePoint = np.zeros(iNumDimensions)
+MiddlePoint = np.zeros((1,iNumDimensions))
 # get new values of parameters
-cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
-                                                     limits,which_to_pert,MiddlePoint)
+cdif_,siga_,qext_,bc_ = new_param_values_list(cdif,siga,qext,bc,\
+                                              limits,which_to_pert,MiddlePoint)
+raise ValueError('a')
 
-A, b = lin_op.build_diffusion_system( qext_, cdif_, siga_, bc, Jinc_, Jneu_)
+A, b = lin_op.build_diffusion_system( qext_, cdif_, siga_, bc_)
 phi = scipy.sparse.linalg.spsolve(A, b)
 new_snap = np.expand_dims(phi, axis=1)
 ur, sv, vh = np.linalg.svd(new_snap, full_matrices=False, compute_uv=True)
@@ -433,18 +342,22 @@ while (not_done):
     lin_op.compute_reduced_operators(ur,bc)
     # select new set of training points
     TrainPoints = sampler(nCandidates, iNumDimensions, use_LHS)
-    cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_list(cdif,siga,qext,Jinc,Jneu,\
+    cdif_,siga_,qext_,bc_ = new_param_values_list(cdif,siga,qext,bc,\
                                                      limits,which_to_pert,TrainPoints)
     # use ROM to evaluate residual error
     Candidate_Error = np.zeros(nCandidates)
     plt.figure(7)
     for ipt in range(nCandidates):
-        Ar, br = lin_op.build_reduced_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], \
-                                          bc, Jinc_[ipt,:], Jneu_[ipt,:])
+        bc__ = {}
+        for key in bc.keys():
+            bc__[key] = {}
+            bc__[key]['markers'] = np.copy(bc_[key]['markers'])
+            bc__[key]['values']  = bc_[key]['values'][ipt,:]
+
+        Ar, br = lin_op.build_reduced_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], bc__)
         c = np.linalg.solve(Ar,br)
         Candidate_Error[ipt] = lin_op.residual_indicator( qext_[ipt,:], cdif_[ipt,:], \
-                                                         siga_[ipt,:], bc, Jinc_[ipt,:],\
-                                                         Jneu_[ipt,:], c)
+                                                         siga_[ipt,:], bc__, c)
         # debug
         """A, b = lin_op.build_diffusion_system( qext_[ipt,:], cdif_[ipt,:], siga_[ipt,:], \
                                           bc, Jinc_[ipt,:], Jneu_[ipt,:])
