@@ -1,5 +1,6 @@
 import numpy as np
 from smt.sampling_methods import LHS
+import matplotlib.pyplot as plt
 
 def sampler(number_of_snapshots, iNumDimensions, use_LHS, do_plot=False):
     if not use_LHS:
