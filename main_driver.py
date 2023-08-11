@@ -72,7 +72,7 @@ else:
 
 # create basename to reload data
 basename = (
-    "./geo-" + str(geo_id_) + "/geo_id" + str(geo_id_) + ref_txt + "_elems" + "151"
+    "./geo-" + str(geo_id_) + "/geo_id" + str(geo_id_) + ref_txt + "_elems" + "3085"
 )
 
 el2pt = np.loadtxt(basename + "_el2pt.txt", dtype=int)
@@ -107,14 +107,29 @@ mesh.complete()
 # Caveat: cdif, qext must be entered in the order the materials are listed
 # in mesh.attr
 if geo_id_ == 1:
+    #              (2)
+    #      5----------------4
+    #      |                |
+    # (3)  |                |
+    #      6                |
+    #      |     3---2      |  (1)
+    # (4)  |    /    |      |
+    #      7   0-----1      |
+    # (3)  |                |
+    #      8----------------9
+    #            (2)
     bc_rob = {
-        "markers": np.array([1, 2, 3, 4], dtype=int),
-        "values": np.array([0.0, 0.0, 0.0, 1.0], dtype=float),
+        "markers": np.array([1, 3, 4], dtype=int),
+        "values": np.array([0.0, 1.0, 1.0], dtype=float),
     }
-    bc = {"Robin": bc_rob}
+    bc_neu = {
+        "markers": np.array([2], dtype=int),
+        "values": np.array([0.0], dtype=float),
+    }
+    bc = {"Robin": bc_rob, "Neumman": bc_neu}
 
-    cdif = np.array([1, 3], dtype=float)
-    qext = np.array([100, 0], dtype=float)
+    cdif = np.array([3, 3], dtype=float)
+    qext = np.array([0, 0], dtype=float)
 else:
     raise ValueError("unknown geo_id = ", geo_id_)
 mesh.check_bc(bc)
@@ -154,6 +169,7 @@ if mesh.npts < 10000:
         mesh.pt2xy[:, 0], mesh.pt2xy[:, 1], Phi, linewidth=0.2, cmap=plt.cm.CMRmap
     )
     plt.show()
+raise ValueError("stopping here")
 ##########################################################
 #
 # Prepare for data perturbations
