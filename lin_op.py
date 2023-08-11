@@ -428,7 +428,7 @@ class LinOp:
             # M/K to qrob
             counter = 0
             for i in range(n_rob):
-                Jinc_i = Jinc[i]
+                Jinc_i = bc.get(key)["values"][i]
                 for j in range(self.mesh.nattr):
                     cdif_j = cdif[j]
                     siga_j = siga[j]
@@ -445,7 +445,7 @@ class LinOp:
             # Arob to qrob
             counter = 0
             for i in range(n_rob):
-                Jinc_i = Jinc[i]
+                Jinc_i = bc.get(key)["values"][i]
                 A1r += Jinc_i * self.Arobqrob[counter]
                 counter += 1
             # q to qrob
@@ -453,15 +453,15 @@ class LinOp:
             for i in range(self.mesh.nattr):
                 qext_i = qext[i]
                 for j in range(n_rob):
-                    Jinc_j = Jinc[j]
+                    Jinc_j = bc.get(key)["values"][j]
                     A11 += qext_i * Jinc_j * self.qqrob[counter]
                     counter += 1
             # qrob to qrob
             counter = 0
             for i in range(n_rob):
-                Jinc_i = Jinc[i]
+                Jinc_i = bc.get(key)["values"][i]
                 for j in range(i, n_rob):  # sum on j starts at i
-                    Jinc_j = Jinc[j]
+                    Jinc_j = bc.get(key)["values"][j]
                     A11 += Jinc_i * Jinc_j * self.qrobqrob[counter]
                     counter += 1
         # Neumann BC:
@@ -471,7 +471,7 @@ class LinOp:
             # M/K to qneu
             counter = 0
             for i in range(n_neu):
-                Jneu_i = Jneu[i]
+                Jneu_i = bc.get(key)["values"][i]
                 for j in range(self.mesh.nattr):
                     cdif_j = cdif[j]
                     siga_j = siga[j]
@@ -482,7 +482,7 @@ class LinOp:
             # Arob to qneu
             counter = 0
             for i in range(n_neu):
-                Jneu_i = Jneu[i]
+                Jneu_i = bc.get(key)["values"][i]
                 A1r += Jneu_i * self.Arobqneu[counter]
                 counter += 1
             # q to qneu
@@ -490,15 +490,15 @@ class LinOp:
             for i in range(self.mesh.nattr):
                 qext_i = qext[i]
                 for j in range(n_neu):
-                    Jneu_j = Jneu[j]
+                    Jneu_j = bc.get(key)["values"][j]
                     A11 += qext_i * Jneu_j * self.qqneu[counter]
                     counter += 1
             # qneu to qneu
             counter = 0
             for i in range(n_neu):
-                Jneu_i = Jneu[i]
+                Jneu_i = bc.get(key)["values"][i]
                 for j in range(i, n_neu):  # sum on j starts at i
-                    Jneu_j = Jneu[j]
+                    Jneu_j = bc.get(key)["values"][j]
                     A11 += Jneu_i * Jneu_j * self.qneuqneu[counter]
                     counter += 1
         # compute residual:
