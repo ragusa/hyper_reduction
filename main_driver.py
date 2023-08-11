@@ -72,7 +72,7 @@ else:
 #  9       | 154, 314, 1542, 3025, 5080, 15246
 
 # create basename to reload data
-basename = './geo-'+str(geo_id_)+'/geo_id' + str(geo_id_) + ref_txt + '_elems' +'151'
+basename = './geo-'+str(geo_id_)+'/geo_id' + str(geo_id_) + ref_txt + '_elems' +'1553'
 
 el2pt = np.loadtxt(basename+'_el2pt.txt', dtype=int)
 el2at = np.loadtxt(basename+'_el2at.txt', dtype=int)
@@ -89,7 +89,7 @@ mesh = TriMesh(el2pt, el2at, fa2pt, fa2ma, pt2xy, el2ne)
 mesh.complete()
 
 # to plot the mesh
-mesh.plot_mesh()
+# mesh.plot_mesh()
 
 # if you want to pickle the data or not
 # import pickle as pickle
@@ -103,79 +103,21 @@ mesh.plot_mesh()
 #
 # data for that problem
 #
-# Caveat: cdif, siga, qext must be entered in the order the materials are listed
+# Caveat: cdif, qext must be entered in the order the materials are listed
 # in mesh.attr
 if geo_id_ == 1:
-    #bc_neu={"markers":np.array([3,4],dtype=int),"values":np.array([0.1,2.5])}
-    bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
     bc_rob={"markers":np.array([1,2,3,4],dtype=int),"values":np.array([0,0,0,1])}
-    bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
-    bc_key_list = ["Dirichlet","Robin","Neumann"]
-    mesh.check_bc(bc, bc_key_list)
+    bc={"Robin":bc_rob}
 
     cdif = np.array([1,3],dtype=float)
-    siga = np.array([50,1],dtype=float)
     qext = np.array([100,0],dtype=float)
     Jinc = np.array([0,0,0,1],dtype=float)
-    Jneu = np.array([0,0,0,0],dtype=float)
-    limits = np.array([])
-elif geo_id_ ==2:
-    bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
-    bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
-    bc_key_list = ["Dirichlet","Robin","Neumann"]
-    mesh.check_bc(bc, bc_key_list)
-
-    sigt = np.array([1,1.5,1],dtype=float)
-    c = np.array([0.9,0.96,0.3],dtype=float)
-    sigs = c*sigt
-    siga = sigt -sigs
-    cdif = 1/(3*sigt)
-    qext = np.array([1,0,0],dtype=float)
-    Jinc = np.array([0],dtype=float)
-    Jneu = np.array([])
-    limits = np.array([])
-elif geo_id_ ==3:
-    bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
-    bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
-    bc_key_list = ["Dirichlet","Robin","Neumann"]
-    mesh.check_bc(bc, bc_key_list)
-
-    sigt = np.array([0.60,0.48,0.70,0.65,0.90],dtype=float)
-    siga = np.array([0.07,0.28,0.04,0.15,0.01],dtype=float)
-    sigs0 = sigt -siga
-    sigs1 = np.array([0.27,0.02,0.30,0.15,0.40],dtype=float)
-    sigtr = sigt - sigs1
-    cdif = 1/(3*sigtr)
-    qext = np.array([1,0,1,0,0],dtype=float)
-    Jinc = np.array([0],dtype=float)
-    Jneu = np.array([])
-    limits = np.array([])
-elif geo_id_ ==4:
-    bc_neu={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_dir={"markers":np.array([],dtype=int),"values":np.array([])}
-    bc_rob={"markers":np.array([1],dtype=int),"values":np.array([0])}
-    bc={"Robin":bc_rob,"Neumann":bc_neu,"Dirichlet":bc_dir}
-    bc_key_list = ["Dirichlet","Robin","Neumann"]
-    mesh.check_bc(bc, bc_key_list)
-
-    siga = np.array([0.0197,0.0197,0.2256,0.0197],dtype=float)
-    sigs = np.array([3.3136,3.3136,1.1077,3.3136],dtype=float)
-    sigt = siga + sigs
-    cdif = 1/(3*sigt)
-    qext = np.array([1,0,0,0],dtype=float)
-    Jinc = np.array([0],dtype=float)
-    Jneu = np.array([])
     limits = np.array([])
 else:
     raise ValueError('unknown geo_id = ',geo_id_)
 
+mesh.check_bc(bc)
 
-raise ValueError('unknown geo_id = ',geo_id_)
 ##########################################################
 #
 # linear operators per attribute
@@ -198,7 +140,9 @@ plt.spy(lin_op.K[1],marker='.',ms=1.,color='red')"""
 #
 # Build system and solve
 #
-A, b = lin_op.build_diffusion_system( qext, cdif, siga, bc, Jinc, Jneu)
+siga = cdif *0
+Jneu = Jinc*0
+A, b = lin_op.build_diffusion_system( qext, cdif, siga, bc)
 Phi = scipy.sparse.linalg.spsolve(A, b)
 
 if mesh.npts < 10000:
@@ -215,6 +159,7 @@ if mesh.npts < 10000:
 # ax.view_init(60, -135)
 # plt.show()
 
+raise ValueError('a')
 ##########################################################
 #
 # Prepare for data perturbations
@@ -303,7 +248,7 @@ def new_param_values_single(cdif, siga, qext, Jinc, Jneu, limits, which_to_pert,
 
     return cdif_,siga_,qext_,Jinc_,Jneu_
 
-if geo_id == 1:
+if geo_id_ == 1:
     which_to_pert = np.zeros(14, dtype=bool)
     which_to_pert[0:5] = True
     #which_to_pert[5] = True
@@ -329,7 +274,7 @@ if geo_id == 1:
     Pts = 0.13*np.ones(5)
     cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
                                                     limits,which_to_pert,Pts)
-elif geo_id == 2:
+elif geo_id_ == 2:
     which_to_pert = np.zeros(10, dtype=bool)
     which_to_pert[0:5] = True
     ff=0.92; a0 = np.array([1-ff,1+ff])
@@ -347,7 +292,7 @@ elif geo_id == 2:
     Pts = 0.13*np.ones(5)
     cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
                                                     limits,which_to_pert,Pts)
-elif geo_id == 3:
+elif geo_id_ == 3:
     which_to_pert = np.zeros(16, dtype=bool)
     which_to_pert[0:5] = True
     ff=0.92; a0 = np.array([1-ff,1+ff])
@@ -365,7 +310,7 @@ elif geo_id == 3:
     Pts = 0.13*np.ones(5)
     cdif_,siga_,qext_,Jinc_,Jneu_ = new_param_values_single(cdif,siga,qext,Jinc,Jneu,\
                                                     limits,which_to_pert,Pts)
-elif geo_id == 4:
+elif geo_id_ == 4:
     which_to_pert = np.zeros(13, dtype=bool)
     which_to_pert[0:5] = True
     ff=0.92; a0 = np.array([1-ff,1+ff])
