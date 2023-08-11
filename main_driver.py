@@ -397,12 +397,12 @@ while not_done:
         not_done = False
     # perform FOM solves for worst param values
     new_snap = np.zeros((mesh.npts, nKeep))
-    for ipt in worst_ind[:nKeep]:
+    for i, ipt in enumerate(worst_ind[:nKeep]):
         bc_ = make_bc_dict(bc, bc_vals, ipt)
         A, b = lin_op.build_diffusion_system(
             qext_[ipt, :], cdif_[ipt, :], siga_[ipt, :], bc_
         )
-        new_snap[:, ipt] = scipy.sparse.linalg.spsolve(A, b)
+        new_snap[:, i] = scipy.sparse.linalg.spsolve(A, b)
     # update the SVD decomposition
     ur, sv, vh = addblock_svd_update(ur, sv, vh, new_snap, force_orth=True)
     print(ur.shape)

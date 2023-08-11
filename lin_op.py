@@ -206,7 +206,7 @@ class LinOp:
             self.qrobr.append(ur.T @ self.qrob[i])
         for i in range(len(self.qneu)):
             self.qneur.append(ur.T @ self.qneu[i])
-        # below, compute reduced operators need for fast estimation of the ROM residual
+        # below, compute reduced operators needed for fast estimation of the ROM residual
         # matrix-matrix
         self.KK = []
         self.MM = []
