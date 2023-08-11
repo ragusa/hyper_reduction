@@ -56,7 +56,7 @@ class LinOp:
                     entries_m += list( self.m.flatten() * self.mesh.detJ[iel] )
                     # stiffness matrix
                     k = np.zeros((3,3))
-                    iJacT = self.mesh.Jac_matrix[:,:,iel]
+                    iJacT = self.mesh.iT_Jac_matrix[:,:,iel]
                     for i in range(3):
                         for j in range(3):
                             k[i,j] += np.dot( iJacT @ self.g[:,i] , iJacT @ self.g[:,j] )
@@ -75,7 +75,7 @@ class LinOp:
 
 
     def build_diffusion_op_per_bc(self, bc):
-        # apply Robin bc conditions
+        # apply Robin bc conditions:
         # phi/4 + D/2 dphi/dn = Jinc
         # {bd} on the LHS: int{bd} (phi/2-2.Jinc).bi
         # Keep on the LHS: int{bd} phi/2.bi
@@ -84,7 +84,7 @@ class LinOp:
         m1d = np.array([ [2, 1],[1, 2] ]) / 6 # /6 = /3/2, the 2 is from Jacobian)
         # deal with Robin part of the matrix
         key = "Robin"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             # get list of face with any nonzero Robin face markers
             faces_rob = np.where( np.in1d( self.mesh.fa2ma , bc.get(key)['markers'] ) )
             # list of such vertices
@@ -94,7 +94,7 @@ class LinOp:
             cols = []
             entries = []
             for i in range(np.shape(vert_list)[0]):
-                # pick vertives for a given Robin edge
+                # pick vertices for a given Robin edge
                 v = vert_list[i,:]
                 ptA = self.mesh.pt2xy[v[0],:]
                 ptB = self.mesh.pt2xy[v[1],:]
@@ -112,7 +112,7 @@ class LinOp:
                                         shape=(self.mesh.npts, self.mesh.npts) )
         # deal with Robin rhs
         self.qrob = []
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             for irob in range( bc.get(key)['markers'].shape[0] ):
                 q = np.zeros(self.mesh.npts)
                 # get list of face with a given Robin face marker
@@ -131,18 +131,18 @@ class LinOp:
                     q[v] += 2*edge_len/2
                 self.qrob.append(q)
 
-        # deal with Robin rhs
+        # deal with Neumann rhs
         self.qneu = []
         key = "Neumann"
-        if self.mesh.is_bc.get(key):
-            for irob in range( bc.get(key)['markers'].shape[0] ):
+        if key in bc.keys():
+            for ineu in range( bc.get(key)['markers'].shape[0] ):
                 q = np.zeros(self.mesh.npts)
-                # get list of face with a given Robin face marker
-                faces_rob = np.where( self.mesh.fa2ma == bc.get(key)['markers'][irob] )
+                # get list of face with a given Neumann face marker
+                faces_neu = np.where( self.mesh.fa2ma == bc.get(key)['markers'][ineu] )
                 # list of such vertices
-                vert_list = self.mesh.fa2pt[faces_rob]
+                vert_list = self.mesh.fa2pt[faces_neu]
                 for i in range(np.shape(vert_list)[0]):
-                    # pick vertives for a given Robin edge
+                    # pick vertices for a given Neumann edge
                     v = vert_list[i,:]
                     ptA = self.mesh.pt2xy[v[0],:]
                     ptB = self.mesh.pt2xy[v[1],:]
@@ -154,10 +154,10 @@ class LinOp:
                 self.qneu.append(q)
 
 
-    def build_diffusion_system(self, qext, cdif, siga, bc, Jinc, Jneu):
+    def build_diffusion_system(self, qext, cdif, siga, bc):
         A = self.build_diffusion_matrix(cdif, siga)
         b = self.build_diffusion_rhs(qext)
-        A,b = self.apply_bc(A, b, bc, Jinc, Jneu)
+        A,b = self.apply_bc(A, b, bc)
         return A, b
 
 
@@ -175,26 +175,20 @@ class LinOp:
         return rhs
 
 
-    def apply_bc(self, A, b, bc, Jinc, Jneu ):
+    def apply_bc(self, A, b, bc):
         key = "Robin"
-        if self.mesh.is_bc.get(key):
-            len_ = bc.get(key)['markers'].shape[0]
-            if  len_ != len(Jinc):
-                raise ValueError('Jinc length = '+str(len(Jinc))+' but it should be = '+str(len_) )
-            for irob in range(len_):
-                b += self.qrob[irob]*Jinc[irob]
+        if key in bc.keys():
             A += self.Arob
+            for irob, value in enumerate(bc.get(key)['values']):
+                b += self.qrob[irob]*value
 
         key = "Neumann"
-        if self.mesh.is_bc.get(key):
-            len_ = bc.get(key)['markers'].shape[0]
-            if  len_ != len(Jneu):
-                raise ValueError('Jneu length = '+str(len(Jneu))+' but it should be = '+str(len_) )
-            for ineu in range(len_):
-                b += self.qneu[ineu]*Jneu[ineu]
+        if key in bc.keys():
+            for ineu, value in enumerate(bc.get(key)['values']):
+                b += self.qneu[ineu]*value
 
         key = "Dirichlet"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             raise ValueError('Apply bc of type'+key+' not implemented yet')
 
         return A, b
@@ -251,7 +245,7 @@ class LinOp:
 
         # Robin BC:
         key = "Robin"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             self.KArob = []; self.MArob = []; self.Kqrob = []; self.Mqrob = [];
             self.Arobq = []; self.Arobqrob = []; self.qrobqrob = []; self.qqrob = [];
             n_rob = bc.get(key)['markers'].shape[0]
@@ -287,7 +281,7 @@ class LinOp:
 
         # Neumann BC:
         key = "Neumann"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             self.Kqneu = []; self.Mqneu = [];
             self.Arobqneu = []; self.qneuqneu = []; self.qqneu = [];
             n_neu = bc.get(key)['markers'].shape[0]
@@ -337,7 +331,7 @@ class LinOp:
         np.save(filename,ur)  
 
 
-    def build_reduced_system(self, qext, cdif, siga, bc, Jinc, Jneu):
+    def build_reduced_system(self, qext, cdif, siga, bc):
         r = self.Kr[1].shape[0]
         Ar = np.zeros((r,r))
         br = np.zeros(r)
@@ -347,17 +341,15 @@ class LinOp:
             br += qext[imat] * self.qr[imat]
     
         key = "Robin"
-        if self.mesh.is_bc.get(key):
-            len_ = bc.get(key)['markers'].shape[0]
-            for irob in range(len_):
-                br += self.qrobr[irob]*Jinc[irob]
+        if key in bc.keys():
             Ar += self.Arobr
+            for irob, value in enumerate(bc.get(key)['values']):
+                br += self.qrobr[irob]*value
     
         key = "Neumann"
-        if self.mesh.is_bc.get(key):
-            len_ = bc.get(key)['markers'].shape[0]
-            for ineu in range(len_):
-                br += self.qneur[ineu]*Jneu[ineu]
+        if key in bc.keys():
+            for ineu, value in enumerate(bc.get(key)['values']):
+                br += self.qneur[ineu]*value
     
         return Ar, br
     
@@ -367,7 +359,7 @@ class LinOp:
         return np.linalg.norm(z)
     
     
-    def residual_indicator(self, qext, cdif, siga, bc, Jinc, Jneu, c):
+    def residual_indicator(self, qext, cdif, siga, bc, c):
         # current reduced system size
         r = len(c)
         Arr = np.zeros((r,r))
@@ -407,7 +399,7 @@ class LinOp:
     
         # Robin BC:
         key = "Robin"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             n_rob = bc.get(key)['markers'].shape[0]
             # Arob to Arob
             Arr += self.ArobArob
@@ -456,7 +448,7 @@ class LinOp:
     
         # Neumann BC:
         key = "Neumann"
-        if self.mesh.is_bc.get(key):
+        if key in bc.keys():
             n_neu = bc.get(key)['markers'].shape[0]
             # M/K to qneu
             counter = 0
