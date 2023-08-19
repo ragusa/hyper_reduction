@@ -81,37 +81,48 @@ class LinOp:
         # {bd} on the LHS: int{bd} (phi/2-2.Jinc).bi
         # Keep on the LHS: int{bd} phi/2.bi
         # Put on the RHS: +int{bd} 2.Jinc.bi
+        # more generally:
+        # a*phi + D dphi/dn = c
+        # For neutronics: a = 2/4 = 1/2; c=2*Jinc
+        # For heat conduction: 
+        # -D dphi/dn = h(phi - phi_inf)
+        # or h*phi + D dphi/dn = h*phi_inf
+        # so a = h, c = h*phi_inf
+        
         # 1d mass matrix, reference element
-        m1d = np.array([[2, 1], [1, 2]]) / 6  # /6 = /3/2, the 2 is from Jacobian)
+        m1d = np.array([[2, 1], [1, 2]]) / 6  # /3, the 2 from Jacobian is not included)
         # deal with Robin part of the matrix
         key = "Robin"
+        self.Arob = []
         if key in bc.keys():
             # get list of face with any nonzero Robin face markers
-            faces_rob = np.where(np.in1d(self.mesh.fa2ma, bc.get(key)["markers"]))
-            # list of such vertices
-            vert_list = self.mesh.fa2pt[faces_rob]
-            # fill in matrix entries
-            rows = []
-            cols = []
-            entries = []
-            for i in range(np.shape(vert_list)[0]):
-                # pick vertices for a given Robin edge
-                v = vert_list[i, :]
-                ptA = self.mesh.pt2xy[v[0], :]
-                ptB = self.mesh.pt2xy[v[1], :]
-                # compute the edge length
-                AB = ptB - ptA
-                edge_len = np.linalg.norm(AB)
-                # connectivity
-                rows += [v[0], v[0], v[1], v[1]]
-                cols += [v[0], v[1], v[0], v[1]]
-                # the 1/2 comes from phi/2 in the formula
-                # the row-sum of m1d already gives dx/2
-                entries += list(m1d.flatten() * edge_len / 2)
-            # build CSR matrix
-            self.Arob = scipy.sparse.csr_matrix(
-                (entries, (rows, cols)), shape=(self.mesh.npts, self.mesh.npts)
-            )
+            # faces_rob = np.where(np.in1d(self.mesh.fa2ma, bc.get(key)["markers"]))
+            for irob in range(bc.get(key)["markers"].shape[0]):
+                faces_rob = np.where(self.mesh.fa2ma == bc.get(key)["markers"][irob])
+                # list of such vertices
+                vert_list = self.mesh.fa2pt[faces_rob]
+                # fill in matrix entries
+                rows = []
+                cols = []
+                entries = []
+                for i in range(np.shape(vert_list)[0]):
+                    # pick vertices for a given Robin edge
+                    v = vert_list[i, :]
+                    ptA = self.mesh.pt2xy[v[0], :]
+                    ptB = self.mesh.pt2xy[v[1], :]
+                    # compute the edge length
+                    AB = ptB - ptA
+                    edge_len = np.linalg.norm(AB)
+                    # connectivity
+                    rows += [v[0], v[0], v[1], v[1]]
+                    cols += [v[0], v[1], v[0], v[1]]
+                    # the coef_a comes from phi/2 in the formula
+                    # the row-sum of m1d gives 3, so we need to * by Jac/2
+                    entries +=  list(m1d.flatten() * edge_len / 2)
+                # build CSR matrix
+                self.Arob.append( scipy.sparse.csr_matrix(
+                    (entries, (rows, cols)), shape=(self.mesh.npts, self.mesh.npts) )
+                )
         # deal with Robin rhs
         self.qrob = []
         if key in bc.keys():
@@ -130,7 +141,8 @@ class LinOp:
                     AB = ptB - ptA
                     edge_len = np.linalg.norm(AB)
                     # rhs vector: 2*Jinc*edge_length/2;
-                    q[v] += 2 * edge_len / 2
+                    # the 2*Jinc is in bc['values']
+                    q[v] += edge_len / 2
                 self.qrob.append(q)
         # deal with Neumann rhs
         self.qneu = []
@@ -175,8 +187,8 @@ class LinOp:
     def apply_bc(self, A, b, bc):
         key = "Robin"
         if key in bc.keys():
-            A += self.Arob
-            for irob, value in enumerate(bc.get(key)["values"]):
+            for irob, (coef_a,value) in enumerate(zip(bc.get(key)["coefs_a"],bc.get(key)["values"])):
+                A += self.Arob[irob] * coef_a
                 b += self.qrob[irob] * value
         key = "Neumann"
         if key in bc.keys():
@@ -188,6 +200,7 @@ class LinOp:
         return A, b
 
     def compute_reduced_operators(self, ur, bc):
+        self.Arobr = []
         self.Mr = []
         self.Kr = []
         self.qr = []
@@ -201,7 +214,8 @@ class LinOp:
             self.Mr.append(Mr)
             self.Kr.append(Kr)
             self.qr.append(qr)
-        self.Arobr = ur.T @ self.Arob @ ur
+        for i in range(len(self.Arob)):
+            self.Arobr.append( ur.T @ self.Arob @ ur )
         for i in range(len(self.qrob)):
             self.qrobr.append(ur.T @ self.qrob[i])
         for i in range(len(self.qneu)):
@@ -357,7 +371,8 @@ class LinOp:
         key = "Robin"
         if key in bc.keys():
             Ar += self.Arobr
-            for irob, value in enumerate(bc.get(key)["values"]):
+            for irob, (coef_a,value) in enumerate(zip(bc.get(key)["coefs_a"],bc.get(key)["values"])):
+                Ar += self.Arobr[irob] * coef_a
                 br += self.qrobr[irob] * value
         key = "Neumann"
         if key in bc.keys():

@@ -24,7 +24,8 @@ plt.close("all")
 geo_id_ = 1
 
 """
-# this part does not work on windows machine
+# this part does not work on windows machines
+
 from create_geometry import create_geometry
 
 # create specific geometry
@@ -89,7 +90,7 @@ from tri_mesh import TriMesh
 mesh = TriMesh(el2pt, el2at, fa2pt, fa2ma, pt2xy, el2ne)
 mesh.complete()
 
-# to plot the mesh
+# to plot the mesh, uncomment this:
 # mesh.plot_mesh()
 
 # if you want to pickle the data or not
@@ -118,9 +119,12 @@ if geo_id_ == 1:
     # (3)  |                |
     #      8----------------9
     #            (2)
+    a = np.ones(3) / 4 * 2
+    c = np.ones(3) * 2
     bc_rob = {
         "markers": np.array([1, 3, 4], dtype=int),
-        "values": np.array([0.0, 1.0, 1.0], dtype=float),
+        "values" : np.array([0.0, 1.0, 1.0], dtype=float) * c,
+        "coefs_a": np.array(a)
     }
     bc_neu = {
         "markers": np.array([2], dtype=int),
@@ -136,7 +140,7 @@ mesh.check_bc(bc)
 
 ##########################################################
 #
-# linear operators per attribute
+# linear operators per zonal attribute and per bc attribute
 #
 from lin_op import LinOp
 
@@ -156,6 +160,8 @@ plt.spy(lin_op.K[1],marker='.',ms=1.,color='red')"""
 #
 # Build system and solve
 #
+# the original code solved a diffusion-reaction equation
+# here, we zero out the reaction term so that we solve a heat conduction problem
 siga = cdif * 0
 
 A, b = lin_op.build_diffusion_system(qext, cdif, siga, bc)
@@ -173,10 +179,15 @@ raise ValueError("stopping here")
 ##########################################################
 #
 # Prepare for data perturbations
-#
+
 def new_param_values_list(cdif, siga, qext, bc, limits, which_to_pert, Pts):
     # Pts: nsamples x effective_npert
     # print('Points');print(Pts)
+
+    # the parameters are ordered as cdif, siga, quext, 
+    # then all bc's as found when looping over bc.keys()
+    # which_to_perturb pertasins to this ordering
+
     nsamples = Pts.shape[0]
     npert = Pts.shape[1]
     if npert != len(np.where(which_to_pert == True)[0]):
@@ -192,6 +203,8 @@ def new_param_values_list(cdif, siga, qext, bc, limits, which_to_pert, Pts):
     tmp = np.kron(aux, one)  # nsamples x npert
     if len(which_to_pert) != limits.shape[0]:
         raise ValueError("len(which_to_pert) != limits.shape[0]")
+    # now that nominal values have been duplicated, we update the
+    # parameters that have been selected for perturbation
     counter = 0
     for p, logical in enumerate(which_to_pert):
         if logical:
@@ -217,9 +230,10 @@ def new_param_values_list(cdif, siga, qext, bc, limits, which_to_pert, Pts):
         n1 = n2
         n2 = n1 + len(bc[key]["values"])
         bc_val[key]["values"] = np.array(tmp[:, n1:n2])
+
     return cdif_, siga_, qext_, bc_val
 
-
+# select parameters for pertubation
 if geo_id_ == 1:
     which_to_pert = np.zeros(10, dtype=bool)
     which_to_pert[0:5] = True
@@ -258,6 +272,8 @@ if geo_id_ == 1:
     )
 else:
     raise ValueError("which_to_pert stills need to be implemented for other geometries")
+
+
 # number of input space dimensions
 iNumDimensions = len(np.where(which_to_pert == True)[0])
 
