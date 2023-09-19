@@ -656,17 +656,47 @@ def create_geometry(geo_id=1, max_vol=1e-2, refinement_funct=None, do_plot=False
     # print(np.array(mesh.regions))
     # print("neighbors")
     # print(np.array(mesh.neighbors))
-    el2pt = np.array(mesh.elements, dtype=int)
-    el2at = np.array(mesh.element_attributes, dtype=int)
-    el2ne = np.array(mesh.neighbors, dtype=int)
-    fa2pt = np.array(mesh.faces, dtype=int)
-    fa2ma = np.array(mesh.face_markers, dtype=int)
-    pt2xy = np.array(mesh.points)
+
+    # el2pt = np.array(mesh.elements, dtype=int)
+    print(mesh.elements[0])
+    el2pt = np.zeros((len(mesh.elements),3),dtype=int)
+    for i in range(len(mesh.elements)):
+        el2pt[i,:] = mesh.elements[i]
+        
+    # el2at = np.array(mesh.element_attributes, dtype=int)
+    print(mesh.element_attributes[0])
+    el2at = np.zeros(len(mesh.element_attributes),dtype=int)
+    for i in range(len(mesh.element_attributes)):
+        el2at[i] = mesh.element_attributes[i]
+    
+    # el2ne = np.array(mesh.neighbors, dtype=int)
+    print(mesh.neighbors[0])
+    el2ne = np.zeros((len(mesh.neighbors),3),dtype=int)
+    for i in range(len(mesh.neighbors)):
+        el2ne[i,:] = mesh.neighbors[i]
+    
+    # fa2pt = np.array(mesh.faces, dtype=int)
+    print(mesh.faces[0])
+    fa2pt = np.zeros((len(mesh.faces),2),dtype=int)
+    for i in range(len(mesh.faces)):
+        fa2pt[i,:] = mesh.faces[i]
+    
+    # fa2ma = np.array(mesh.face_markers, dtype=int)
+    print(mesh.face_markers[0])
+    fa2ma = np.zeros(len(mesh.face_markers),dtype=int)
+    for i in range(len(mesh.face_markers)):
+        fa2ma[i] = mesh.face_markers[i]
+    
+    # pt2xy = np.array(mesh.points)
+    print(mesh.points[0])
+    pt2xy = np.zeros((len(mesh.points),2))
+    for i in range(len(mesh.points)):
+        pt2xy[i,:] = mesh.points[i]
 
     # plot it
     if do_plot:
-        mesh_points = np.array(mesh.points)
-        mesh_tris = np.array(mesh.elements)
+        mesh_points = np.copy(pt2xy)
+        mesh_tris = np.copy(el2pt)
 
         plt.figure(figsize=(9, 8), dpi=160, facecolor="w", edgecolor="k")
         plt.triplot(mesh_points[:, 0], mesh_points[:, 1], mesh_tris)
